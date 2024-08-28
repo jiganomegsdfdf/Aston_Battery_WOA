@@ -1,0 +1,60 @@
+[Version]
+Signature="$WINDOWS NT$"
+Class=Battery
+ClassGuid={72631e54-78a4-11d0-bcf7-00aa00b7b32a}
+Provider=%ProviderName%
+DriverVer = 06/15/2020,2.35.139.0
+CatalogFile=AstonBattery.cat
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskId1%,,,""
+
+[SourceDisksFiles]
+AstonBattery.sys  = 1,,
+
+;*****************************************
+; Aston Battery Mini Class Install Section
+;*****************************************
+
+[Manufacturer]
+%ProviderName%=Standard,NT$ARCH$.10.0...22000
+
+[Standard.NT$ARCH$.10.0...22000]
+%AstonBattery.DeviceDesc% = AstonBattery_Device, ACPI\ASTO2754
+
+[AstonBattery_Device.NT]
+CopyFiles=AstonBattery_Device_Drivers
+Include=battery.inf
+Needs=Battery_Inst
+
+[AstonBattery_Device_Drivers]
+AstonBattery.sys
+
+;-------------- Service installation
+
+[AstonBattery_Device.NT.Services]
+AddService = AstonBattery,%SPSVCINST_ASSOCSERVICE%,AstonBattery_Service_Inst
+
+; -------------- AstonBattery driver install sections
+
+[AstonBattery_Service_Inst]
+DisplayName    = %AstonBattery.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\AstonBattery.sys
+
+;*****************************************
+; Literals
+;*****************************************
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ProviderName = "Aston"
+DiskId1 = "Aston Battery Mini Class Installation Disk"
+AstonBattery.DeviceDesc = "Aston Battery"
+AstonBattery.SVCDESC = "Aston Battery"
