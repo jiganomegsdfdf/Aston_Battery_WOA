@@ -25,7 +25,7 @@ Abstract:
 
 //------------------------------------------------------------------- Prototypes
 
-#define AstonBatteryConvertToWatts(Value) ((Value) * 3870) / 1000
+#define AstonBatteryConvertMAHToMWH(Value) ((Value) * 9)
 
 _IRQL_requires_same_
 VOID
@@ -206,7 +206,7 @@ AstonBatteryQueryBatteryInformation(
 		goto Exit;
 	}
 
-	//BatteryInformationResult->DesignedCapacity = 5500;
+	BatteryInformationResult->DesignedCapacity = AstonBatteryConvertMAHToMWH(BatteryInformationResult->DesignedCapacity * 2);
 
 	Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x12, &BatteryInformationResult->FullChargedCapacity, 2);
 	if (!NT_SUCCESS(Status))
@@ -215,7 +215,7 @@ AstonBatteryQueryBatteryInformation(
 		goto Exit;
 	}
 
-	BatteryInformationResult->FullChargedCapacity = BatteryInformationResult->FullChargedCapacity * 2;
+	BatteryInformationResult->FullChargedCapacity = AstonBatteryConvertMAHToMWH(BatteryInformationResult->FullChargedCapacity * 2);
 	
 	Trace(TRACE_LEVEL_INFORMATION, SURFACE_BATTERY_TRACE, "FullChargedCapacity 0x13: %x", BatteryInformationResult->FullChargedCapacity);
 
@@ -395,8 +395,8 @@ Return Value:
 
 	ULONG VBATT = 3900 * 2;
 	ULONG MINV = 3400 * 2;
-	ULONG MAXV = 4400 * 2;
-	ULONG FullChgCap = 5500;
+	ULONG MAXV = 4440 * 2;
+	ULONG FullChgCap = 24750;
 
 	BATTERY_REPORTING_SCALE ReportingScale = { 0 };
 	BATTERY_INFORMATION BatteryInformationResult = { 0 };
@@ -414,10 +414,6 @@ Return Value:
 		Status = STATUS_NO_SUCH_DEVICE;
 		goto QueryInformationEnd;
 	}
-
-	//
-	// Determine the value of the information being queried for and return it.
-	//
 
 	ReturnBuffer = NULL;
 	ReturnBufferLength = 0;
@@ -451,13 +447,6 @@ Return Value:
 		break;
 
 	case BatteryUniqueID:
-		//Status = AstonBatteryGetManufacturerBlockA(DevExt, &ManufacturerBlockInfoA);
-		//if (!NT_SUCCESS(Status))
-		//{
-		//	Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "AstonBatteryGetManufacturerBlockA failed with Status = 0x%08lX\n", Status);
-		//	goto Exit;
-		//}
-
 		swprintf_s(StringResult, sizeof(StringResult) / sizeof(WCHAR), L"%c%c%c%c%c%c%c%c%c%c%c%c%u",
 			'O',
 			'P',
@@ -494,16 +483,14 @@ Return Value:
 		break;
 
 	case BatteryManufactureName:
-		//Status = AstonBatteryGetManufacturerBlockA(DevExt, &ManufacturerBlockInfoA);
-		//if (!NT_SUCCESS(Status))
-		//{
-		//	Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "AstonBatteryGetManufacturerBlockA failed with Status = 0x%08lX\n", Status);
-		//	goto Exit;
-		//}
-
-		swprintf_s(StringResult, sizeof(StringResult) / sizeof(WCHAR), L"%c%c",
+		swprintf_s(StringResult, sizeof(StringResult) / sizeof(WCHAR), L"%c%c%c%c%c%c%c",
 			0x4f,  // O
-			0x50   // P
+			0x4e,  // N
+			0x45,  // E
+			0x50,  // P
+			0x4c,  // L
+			0x55,  // U
+			0x53   // S
 		);
 
 		Trace(
@@ -527,20 +514,13 @@ Return Value:
 		break;
 
 	case BatteryDeviceName:
-		//Status = AstonBatteryGetManufacturerBlockA(DevExt, &ManufacturerBlockInfoA);
-		//if (!NT_SUCCESS(Status))
-		//{
-		//	Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "AstonBatteryGetManufacturerBlockA failed with Status = 0x%08lX\n", Status);
-		//	goto Exit;
-		//}
-
 		swprintf_s(StringResult, sizeof(StringResult) / sizeof(WCHAR), L"%c%c%c%c%c%c",
 			0x42,  //B
 			0x4c,  //L
 			0x50,  //P
-			0x37,  //7
-			0x34,  //4
-			0x35   //5
+			0x41,  //A
+			0x33,  //3
+			0x33   //3
 		);
 
 		Trace(
@@ -594,23 +574,9 @@ Return Value:
 		break;
 
 	case BatteryManufactureDate:
-		//Status = AstonBatteryGetManufacturerBlockA(DevExt, &ManufacturerBlockInfoA);
-		//if (!NT_SUCCESS(Status))
-		//{
-		//	Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "AstonBatteryGetManufacturerBlockA failed with Status = 0x%08lX\n", Status);
-		//	goto Exit;
-		//}
-
-		//Trace(
-		//	TRACE_LEVEL_INFORMATION,
-		//	SURFACE_BATTERY_TRACE,
-		//	"BatteryManufactureDate: %d\n",
-		//	ManufacturerBlockInfoA.BatteryManufactureDate);
-
-		////ManufactureDate.Year = ManufacturerBlockInfoA.BatteryManufactureDate;
 		ManufactureDate.Day = 1;
 		ManufactureDate.Month = 1;
-		ManufactureDate.Year = 2019;
+		ManufactureDate.Year = 2024;
 
 		ReturnBuffer = &ManufactureDate;
 		ReturnBufferLength = sizeof(BATTERY_MANUFACTURE_DATE);
@@ -632,7 +598,7 @@ Return Value:
 			goto Exit;
 		}
 
-		ReportingScale.Capacity = ((VBATT - MINV) * (FullChgCap * 2)) / (MAXV - MINV);
+		ReportingScale.Capacity = AstonBatteryConvertMAHToMWH(((VBATT - MINV) * (FullChgCap * 2)) / (MAXV - MINV));
 		ReportingScale.Granularity = 1;
 
 		Trace(
@@ -742,8 +708,8 @@ Return Value:
 
 	ULONG VBATT = 3900 * 2;
 	ULONG MINV = 3400 * 2;
-	ULONG MAXV = 4400 * 2;
-	ULONG FullChgCap = 5500;
+	ULONG MAXV = 4440 * 2;
+	ULONG FullChgCap = 24750;
 
 	Trace(TRACE_LEVEL_INFORMATION, SURFACE_BATTERY_TRACE, "Entering %!FUNC!\n");
 	PAGED_CODE();
@@ -783,10 +749,8 @@ Return Value:
 		goto QueryStatusEnd;
 	}
 
-	BatteryStatus->Capacity = ((VBATT - MINV) * (FullChgCap * 2)) / (MAXV - MINV);
+	BatteryStatus->Capacity = AstonBatteryConvertMAHToMWH(((VBATT - MINV) * (FullChgCap * 2)) / (MAXV - MINV));
 	BatteryStatus->Voltage = VBATT;
-
-	//BatteryStatus->Rate = AstonBatteryConvertToWatts(BatteryStatus->Rate);
 
 	Trace(
 		TRACE_LEVEL_INFORMATION,
