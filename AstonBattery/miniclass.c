@@ -13,8 +13,9 @@ Abstract:
 
 	N.B. This code is provided "AS IS" without any expressed or implied warranty.
 
+@see https://www.ti.com/lit/ug/sluua65e/sluua65e.pdf
+
 --*/
-// TODO: FIX the Charge Count.
 
 //--------------------------------------------------------------------- Includes
 
@@ -544,13 +545,6 @@ Return Value:
 		break;
 
 	case BatterySerialNumber:
-		//Status = AstonBatteryGetManufacturerBlockA(DevExt, &ManufacturerBlockInfoA);
-		//if (!NT_SUCCESS(Status))
-		//{
-		//	Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "AstonBatteryGetManufacturerBlockA failed with Status = 0x%08lX\n", Status);
-		//	goto Exit;
-		//}
-
 		swprintf_s(StringResult, sizeof(StringResult) / sizeof(WCHAR), L"%u", (UINT32)2333);
 
 		Trace(
