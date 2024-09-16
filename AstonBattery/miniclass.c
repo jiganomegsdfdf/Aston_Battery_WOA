@@ -198,7 +198,7 @@ AstonBatteryQueryBatteryInformation(
 	// BATTERY_CAPACITY_RELATIVE |
 	BatteryInformationResult->Technology = 1;
 
-	BYTE LION[4] = {'L','I','O','N'};
+	BYTE LION[4] = { 'L','I','O','N' };
 	RtlCopyMemory(BatteryInformationResult->Chemistry, LION, 4);
 	Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x3C, &BatteryInformationResult->DesignedCapacity, 2);
 	if (!NT_SUCCESS(Status))
@@ -217,7 +217,7 @@ AstonBatteryQueryBatteryInformation(
 	}
 
 	BatteryInformationResult->FullChargedCapacity = AstonBatteryConvertMAHToMWH(BatteryInformationResult->FullChargedCapacity * 2);
-	
+
 	Trace(TRACE_LEVEL_INFORMATION, SURFACE_BATTERY_TRACE, "FullChargedCapacity 0x13: %x", BatteryInformationResult->FullChargedCapacity);
 
 	Trace(TRACE_LEVEL_INFORMATION, SURFACE_BATTERY_TRACE, "FullChargedCapacity BeforeTransfer 0x12: %x", BatteryInformationResult->FullChargedCapacity);
@@ -393,11 +393,7 @@ Return Value:
 	PVOID ReturnBuffer;
 	size_t ReturnBufferLength;
 	NTSTATUS Status;
-
-	ULONG VBATT = 3900 * 2;
-	ULONG MINV = 3400 * 2;
-	ULONG MAXV = 4440 * 2;
-	ULONG FullChgCap = 24750;
+	ULONG Percentage = 8000;
 
 	BATTERY_REPORTING_SCALE ReportingScale = { 0 };
 	BATTERY_INFORMATION BatteryInformationResult = { 0 };
@@ -578,21 +574,14 @@ Return Value:
 		break;
 
 	case BatteryGranularityInformation:
-		Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x08, &VBATT, 2);
+		Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x10, &Percentage, 2);
 		if (!NT_SUCCESS(Status))
 		{
 			Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "SpbReadDataSynchronously failed with Status = 0x%08lX\n", Status);
 			goto Exit;
 		}
 
-		Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x12, &FullChgCap, 2);
-		if (!NT_SUCCESS(Status))
-		{
-			Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "SpbReadDataSynchronously failed with Status = 0x%08lX\n", Status);
-			goto Exit;
-		}
-
-		ReportingScale.Capacity = AstonBatteryConvertMAHToMWH(((VBATT - MINV) * (FullChgCap * 2)) / (MAXV - MINV));
+		ReportingScale.Capacity = AstonBatteryConvertMAHToMWH(Percentage * 2);
 		ReportingScale.Granularity = 1;
 
 		Trace(
@@ -700,10 +689,8 @@ Return Value:
 	PSURFACE_BATTERY_FDO_DATA DevExt;
 	NTSTATUS Status;
 
-	ULONG VBATT = 3900 * 2;
-	ULONG MINV = 3400 * 2;
-	ULONG MAXV = 4440 * 2;
-	ULONG FullChgCap = 24750;
+	ULONG VBATT = 8000;
+	ULONG Percentage = 24750 * 2;
 
 	Trace(TRACE_LEVEL_INFORMATION, SURFACE_BATTERY_TRACE, "Entering %!FUNC!\n");
 	PAGED_CODE();
@@ -720,7 +707,7 @@ Return Value:
 		SURFACE_BATTERY_TRACE,
 		"BATTERY_DISCHARGING\n");
 
-	Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x02, &BatteryStatus->Rate, 2);
+	Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x0C, &BatteryStatus->Rate, 2);
 	if (!NT_SUCCESS(Status))
 	{
 		Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "SpbReadDataSynchronously failed with Status = 0x%08lX\n", Status);
@@ -736,14 +723,14 @@ Return Value:
 		goto QueryStatusEnd;
 	}
 
-	Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x12, &FullChgCap, 2);
+	Status = SpbReadDataSynchronously(&DevExt->I2CContext, 0x10, &Percentage, 2);
 	if (!NT_SUCCESS(Status))
 	{
 		Trace(TRACE_LEVEL_ERROR, SURFACE_BATTERY_TRACE, "SpbReadDataSynchronously failed with Status = 0x%08lX\n", Status);
 		goto QueryStatusEnd;
 	}
 
-	BatteryStatus->Capacity = AstonBatteryConvertMAHToMWH(((VBATT - MINV) * (FullChgCap * 2)) / (MAXV - MINV));
+	BatteryStatus->Capacity = AstonBatteryConvertMAHToMWH(Percentage * 2);
 	BatteryStatus->Voltage = VBATT;
 
 	Trace(
@@ -904,8 +891,6 @@ Return Value:
 	PULONG CriticalBias;
 	PBATTERY_CHARGER_ID ChargerId;
 	PBATTERY_CHARGER_STATUS ChargerStatus;
-	//PBATTERY_USB_CHARGER_STATUS UsbChargerStatus;
-	//PUSBFN_PORT_TYPE UsbFnPortType;
 	PSURFACE_BATTERY_FDO_DATA DevExt;
 	NTSTATUS Status;
 
@@ -976,21 +961,6 @@ Return Value:
 		Trace(TRACE_LEVEL_INFORMATION, SURFACE_BATTERY_INFO,
 			"AstonBattery : BatteryChargingSource Type = %d\n",
 			ChargerStatus->Type);
-
-		/*if (ChargerStatus->Type == BatteryChargingSourceType_USB)
-		{
-			UsbChargerStatus = (PBATTERY_USB_CHARGER_STATUS)Buffer;
-
-			Trace(TRACE_LEVEL_INFORMATION, SURFACE_BATTERY_INFO,
-				"AstonBattery : BatteryChargingSourceType_USB: Flags = %d, MaxCurrent = %d, Voltage = %d, PortType = %d, PortId = %llu, OemCharger = %!GUID!\n",
-				UsbChargerStatus->Flags, UsbChargerStatus->MaxCurrent, UsbChargerStatus->Voltage, UsbChargerStatus->PortType, UsbChargerStatus->PortId, &UsbChargerStatus->OemCharger);
-
-			UsbFnPortType = (PUSBFN_PORT_TYPE)UsbChargerStatus->PowerSourceInformation;
-
-			Trace(TRACE_LEVEL_INFORMATION, SURFACE_BATTERY_INFO,
-				"AstonBattery : UsbFnPortType = %d\n",
-				*UsbFnPortType);
-		}*/
 
 		Status = STATUS_SUCCESS;
 	}
